@@ -3,7 +3,7 @@ from kivy.lang import Builder
 from kivy.metrics import dp
 from kivymd.app import MDApp
 from kivymd.uix.boxlayout import MDBoxLayout
-from kivy.uix.gridlayout import GridLayout # Pastikan pakai yang standar
+from kivy.uix.gridlayout import GridLayout
 from kivymd.uix.textfield import MDTextField
 from kivymd.uix.label import MDLabel
 from kivymd.uix.button import MDButton, MDButtonText
@@ -15,20 +15,16 @@ KV = """
 #:import NoTransition kivy.uix.screenmanager.NoTransition
 
 <InputScreen>:
-    MDBoxLayout:
-        orientation: "vertical"
-        padding: dp(10)
-        spacing: dp(10)
+    ScrollView:
+        do_scroll_x: False
+        do_scroll_y: True
         
-        ScrollView:
-            do_scroll_x: False
-            do_scroll_y: True
-            
-            MDBoxLayout:
-                id: content_container
-                orientation: "vertical"
-                adaptive_height: True
-                spacing: dp(10)
+        MDBoxLayout:
+            id: content_container
+            orientation: "vertical"
+            adaptive_height: True
+            padding: dp(10)
+            spacing: dp(10)
 
 MDScreen:
     md_bg_color: app.theme_cls.backgroundColor
@@ -36,11 +32,11 @@ MDScreen:
     MDBoxLayout:
         orientation: "vertical"
         
-        # --- Header: Input N ---
+        # --- 1. Header & Input N (Fixed Height) ---
         MDBoxLayout:
             orientation: "horizontal"
             spacing: dp(10)
-            padding: dp(16)
+            padding: dp(10)
             adaptive_height: True
             md_bg_color: [0.96, 0.96, 0.96, 1]
 
@@ -58,11 +54,11 @@ MDScreen:
                 MDButtonText:
                     text: "Buat Input"
 
-        # --- Navigasi Mode ---
+        # --- 2. Navigasi Mode (Fixed Height) ---
         MDBoxLayout:
             adaptive_height: True
             spacing: dp(10)
-            padding: dp(16), 0, dp(16), dp(10)
+            padding: dp(10), 0, dp(10), dp(5)
             
             MDButton:
                 style: "tonal"
@@ -78,42 +74,64 @@ MDScreen:
                 MDButtonText:
                     text: "Mode Persamaan"
 
-        # --- Area Input (Screen Manager) ---
-        ScreenManager:
-            id: screen_manager
-            transition: NoTransition()
-
-            # Screen akan diisi lewat Python
+        # --- 3. Area Input (35% Layar) ---
+        # Kita batasi tingginya agar tidak memakan tempat hasil
+        MDBoxLayout:
+            size_hint_y: 0.35
             
-        # --- Tombol Hitung & Hasil ---
+            ScreenManager:
+                id: screen_manager
+                transition: NoTransition()
+            
+        # --- 4. Area Hasil (65% Layar - LEBIH BESAR) ---
         MDBoxLayout:
             orientation: "vertical"
-            padding: dp(16)
-            spacing: dp(10)
-            size_hint_y: 0.45
+            padding: dp(10)
+            spacing: dp(5)
+            size_hint_y: 0.65  # Porsi lebih besar untuk hasil
             md_bg_color: [0.92, 0.94, 1, 1]
 
             MDButton:
                 style: "filled"
                 pos_hint: {"center_x": 0.5}
                 on_release: app.solve_logic()
+                size_hint_y: None
+                height: dp(40)
                 MDButtonText:
                     text: "Hitung Solusi (Cramer)"
 
             MDLabel:
-                text: "HASIL PERHITUNGAN:"
+                text: "LANGKAH & HASIL:"
                 bold: True
                 size_hint_y: None
-                height: dp(20)
+                height: dp(30)
+                halign: "center"
 
+            # --- SCROLLVIEW UTAMA HASIL ---
             ScrollView:
+                do_scroll_x: True  # Aktifkan scroll horizontal jika matriks melebar
+                do_scroll_y: True  # Aktifkan scroll vertikal
+                bar_width: dp(12)  # Scrollbar lebih tebal agar mudah disentuh
+                bar_color: [0.2, 0.4, 0.8, 0.8] # Warna scrollbar biru
+
                 MDLabel:
                     id: result_label
-                    text: "Pilih n, klik Buat Input, lalu isi data..."
+                    text: "Masukan data di atas lalu klik Hitung..."
                     markup: True
                     valign: "top"
-                    size_hint_y: None
+                    
+                    # --- KUNCI AGAR BISA SCROLL ---
+                    # 1. Matikan size_hint
+                    size_hint: None, None
+                    # 2. Lebar mengikuti parent (agar wrap) atau lebih lebar jika perlu
+                    width: self.parent.width
+                    # 3. Tinggi mengikuti isi teks (texture_size)
                     height: self.texture_size[1]
+                    # 4. text_size memastikan teks 'wrap' ke bawah
+                    text_size: self.width, None
+                    
+                    padding: dp(10), dp(10)
+                    theme_text_color: "Primary"
 """
 
 class InputScreen(Screen):
@@ -155,7 +173,7 @@ class CramerFinalApp(MDApp):
         except:
             return
 
-        # 1. Bersihkan wadah lama
+        # 1. Bersihkan
         container_matrix = self.screen_matrix.ids.content_container
         container_eq = self.screen_eq.ids.content_container
         container_matrix.clear_widgets()
@@ -168,8 +186,6 @@ class CramerFinalApp(MDApp):
         # 2. BANGUN LAYOUT MATRIKS
         h_layout = MDBoxLayout(orientation="horizontal", spacing=dp(10), adaptive_height=True)
         
-        # === PERBAIKAN GRID A ===
-        # Hapus 'adaptive_height=True', ganti dengan size_hint_y=None dan bind
         grid_a = GridLayout(cols=self.n, spacing=dp(5), size_hint_x=0.75, size_hint_y=None)
         grid_a.bind(minimum_height=grid_a.setter('height')) 
         
@@ -181,8 +197,6 @@ class CramerFinalApp(MDApp):
                 row_inputs.append(tf)
             self.matrix_inputs.append(row_inputs)
         
-        # === PERBAIKAN GRID B ===
-        # Hapus 'adaptive_height=True', ganti dengan size_hint_y=None dan bind
         grid_b = GridLayout(cols=1, spacing=dp(5), size_hint_x=0.25, size_hint_y=None)
         grid_b.bind(minimum_height=grid_b.setter('height'))
 
@@ -270,7 +284,28 @@ class CramerFinalApp(MDApp):
             
         return A, b, sorted_vars
 
+    def format_matrix_text(self, M):
+        """Helper: Mengubah list 2D menjadi string format matriks yang rapi."""
+        txt = ""
+        cols = len(M[0])
+        col_widths = [0] * cols
+        for row in M:
+            for i, val in enumerate(row):
+                w = len(f"{val:.1f}")
+                if w > col_widths[i]: col_widths[i] = w
+        
+        for row in M:
+            row_str = "| "
+            for i, val in enumerate(row):
+                row_str += f"{val:>{col_widths[i]}.1f}  "
+            row_str += "|\n"
+            txt += row_str
+        return txt
+
     def solve_logic(self):
+        # Reset text size logic setiap kali hitung
+        self.root.ids.result_label.text = "Menghitung..."
+        
         if self.current_mode == "matrix":
             A, b, var_names = self.parse_matrix_mode()
         else:
@@ -281,21 +316,40 @@ class CramerFinalApp(MDApp):
             return
 
         detA = self.determinant(A)
+        
         output = []
-        output.append(f"[b]Mode:[/b] {self.current_mode.capitalize()}")
-        output.append(f"[b]Determinan Utama (D) = {detA:.2f}[/b]")
+        output.append(f"[b][size=20]LANGKAH PENYELESAIAN (CRAMER)[/size][/b]\n")
+        
+        output.append("[b]1. Matriks Koefisien (A):[/b]")
+        output.append(f"[font=RobotoMono-Regular]{self.format_matrix_text(A)}[/font]") 
+        output.append(f"Determinan Utama (D) = [b][color=2196F3]{detA:.2f}[/color][/b]\n")
 
         if abs(detA) < 1e-9:
-            output.append("[color=red]Tidak ada solusi tunggal (D=0)[/color]")
+            output.append("[color=red]D = 0. SPL tidak memiliki solusi tunggal.[/color]")
         else:
-            output.append("\n[b]Solusi:[/b]")
+            output.append("[b]2. Matriks Pengganti & Variabel:[/b]")
+            results = []
             for j in range(self.n):
                 Aj = self.replace_column(A, j, b)
                 detAj = self.determinant(Aj)
                 val = detAj / detA
-                output.append(f"{var_names[j]} = {detAj:.2f} / {detA:.2f} = [color=blue][b]{val:.4f}[/b][/color]")
+                var_name = var_names[j]
+                
+                output.append(f"\n[color=00796B][b]• Variabel {var_name}:[/b][/color]")
+                output.append(f"Ganti kolom ke-{j+1} dgn vektor b:")
+                output.append(f"[font=RobotoMono-Regular]{self.format_matrix_text(Aj)}[/font]")
+                output.append(f"Determinan (D_{var_name}) = {detAj:.2f}")
+                output.append(f"{var_name} = {detAj:.2f} / {detA:.2f} = [b][size=16]{val:.4f}[/size][/b]")
+                results.append(f"{var_name} = {val:.4f}")
 
-        self.root.ids.result_label.text = "\n".join(output)
+            output.append("\n==============================")
+            output.append("[b][size=18]HASIL AKHIR:[/size][/b]")
+            output.append(", ".join(results))
+            # Tambahkan baris kosong ekstra di bawah agar scroll tidak mentok
+            output.append("\n\n") 
+
+        final_text = "\n".join(output)
+        self.root.ids.result_label.text = final_text
 
     def determinant(self, M):
         n = len(M)
